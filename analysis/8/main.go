@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"crypto/md5"
+	"encoding/hex"
 	"flag"
 	"github.com/sirupsen/logrus"
 	"io"
@@ -87,6 +89,27 @@ func main()  {
 }
 
 func logConsumer(logchan chan string, pvchan, uvchan chan urlData)  {
+	for logstr := range logchan{
+		//切割日志，抠出打点上报日志
+		data := cutLogFetchData(logstr)
+
+		//uid 模拟生成uid
+		hasher := md5.New()
+		hasher.Write([]byte(data))
+		uid := hex.EncodeToString(hasher.Sum(nil))
+
+
+		//这边完成解析工作
+
+		uData := urlData{
+			data:{},
+			uid: uid,
+		}
+
+		log.Infoln(uData)
+		pvchan <- uData
+		uvchan <- uData
+	}
 
 }
 
