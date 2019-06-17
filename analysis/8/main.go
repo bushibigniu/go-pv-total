@@ -5,12 +5,16 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"flag"
+	"github.com/mgutz/str"
 	"github.com/sirupsen/logrus"
 	"io"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 )
+
+const HANDLE_DIG  = "/dig?"
 
 type cmdParams struct {
 	filePath string
@@ -95,14 +99,15 @@ func logConsumer(logchan chan string, pvchan, uvchan chan urlData)  {
 
 		//uid 模拟生成uid
 		hasher := md5.New()
-		hasher.Write([]byte(data))
+		hasher.Write([]byte(data.url+data.ua))
 		uid := hex.EncodeToString(hasher.Sum(nil))
 
 
 		//这边完成解析工作
+		//...TODO
 
 		uData := urlData{
-			data:{},
+			data:data,
 			uid: uid,
 		}
 
@@ -145,9 +150,53 @@ func readFileLine(params cmdParams, logChan chan string) error {
 	return nil
 }
 
-func cutLogFetchData(logstr string) string {
-	//切割日志，抠出打点上报日志
+func cutLogFetchData(logstr string) digData {
+	//两边去空格
 	logstr = strings.TrimSpace(logstr)
 
-	return logstr
+	//position := str.IndexOf(logstr, HANDLE_DIG, 0)
+	position := getIndexOf(logstr, HANDLE_DIG, 0)
+	if position == -1 {
+		return digData{}
+	}
+
+	position += len(HANDLE_DIG)
+	positionHttp := getIndexOf(logstr, "HTTP/", position)
+
+	str := str.Substr(logstr, position, positionHttp-position)
+
+	url, err := url.Parse("http://localhost/?"+str)
+	if err != nil {
+		return  digData{}
+	}
+	data := url.Query()
+
+
+	return digData{
+		data.Get("time"),
+		data.Get("url"),
+		data.Get("refer"),
+		data.Get("ua"),
+	}
+}
+
+func getIndexOf(s string, needle string, start int) int {
+	l := len(s)
+	if needle == "" {
+		if start < 0 {
+			return 0
+		} else if start < l {
+			return start
+		} else {
+			return l
+		}
+	}
+	if start < 0 || start > l-1 {
+		return -1
+	}
+	pos := strings.Index(s[start:], needle)
+	if pos == -1 {
+		return -1
+	}
+	return start + pos
 }
